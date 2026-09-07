@@ -1,6 +1,14 @@
 Config = {}
 
 -- ============================================================
+-- DEBUG
+-- ============================================================
+-- Prints every entry/jack decision to the F8 console (client) and
+-- server console (server), with the reasoning behind it. Toggle at
+-- runtime client-side with /acj_debug, or flip this default.
+Config.Debug = false
+
+-- ============================================================
 -- CONTROLS
 -- ============================================================
 -- 75 = INPUT_ENTER, the default GTA V "enter/exit vehicle" key (F on keyboard).

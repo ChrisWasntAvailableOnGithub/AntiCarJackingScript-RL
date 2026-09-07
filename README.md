@@ -64,6 +64,43 @@ All tunables live in `config.lua`:
   for your own framework's notify function if you'd rather use that.
 - `Config.RespectVehicleLock` — set `false` if you don't want locked
   vehicles treated specially (not recommended).
+- `Config.Debug` — set `true` (or run `/acj_debug` in the client
+  console/chat at runtime) to print every entry/jack decision to the F8
+  console: which seat was resolved as nearest, whether it was free,
+  sprint state, which branch fired, and whether an entry attempt
+  actually landed. Use this to diagnose "I pressed F and nothing
+  happened" reports — reproduce the issue with debug on and read the
+  console output for the exact reason it stopped.
+
+## Troubleshooting: passenger can't get in while someone is driving
+
+If a passenger presses `F` next to a vehicle that already has a driver
+and nothing happens, turn on `/acj_debug` and reproduce it. Two
+distinct causes look identical from the player's perspective but log
+differently:
+
+- **The nearest-door resolves to the driver's seat, not the passenger's.**
+  This happens if the passenger approaches from an angle where the
+  driver door bone is genuinely closer (e.g. cutting across the front of
+  the car), and they're still sprinting when they hit `F` (very common —
+  players usually run up to their car). Since the seat is occupied and
+  they're sprinting, the script treats it as an intentional jack attempt
+  instead of routing them to the free passenger seat. The debug log will
+  show `Nearest seat: driver ... OCCUPIED. sprinting=true` right before
+  a jack request. If this is what you're seeing, walk up to the
+  passenger-side door specifically, or stop sprinting a step before
+  pressing `F`.
+- **The passenger seat resolves correctly and is free, but
+  `TaskEnterVehicle` stalls anyway.** This is a known FiveM quirk where
+  entering a vehicle currently owned (network-wise) by another client —
+  i.e. whoever's driving — can silently fail to complete. The script now
+  has a built-in safety net for this: if a ped hasn't actually landed in
+  the seat ~4.5s after `EnterSeat` was called, it automatically retries
+  once. With debug on you'll see `WARNING: entry into <seat> stalled
+  after 4.5s, retrying once`. If it keeps happening every time, it's
+  worth trying to reproduce it with the driver seated vs. the driver
+  still mid-entry-animation, since that timing window is the most likely
+  trigger.
 
 ## Notes / limitations
 

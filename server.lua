@@ -19,6 +19,11 @@ local function now()
     return GetGameTimer()
 end
 
+local function DebugPrint(fmt, ...)
+    if not Config.Debug then return end
+    print(('[anti-carjacking:server] ' .. fmt):format(...))
+end
+
 local function isOnCooldown(src)
     local last = lastJackBySource[src]
     if not last then return false end
@@ -39,14 +44,19 @@ local function lockSeat(vehNetId, seatIndex)
 end
 
 local function deny(src, reason)
+    DebugPrint('Denying jack request from %d: %s', src, reason)
     TriggerClientEvent('anticarjack:jackDenied', src, reason)
 end
 
 RegisterNetEvent('anticarjack:requestJack')
 AddEventHandler('anticarjack:requestJack', function(vehNetId, seatIndex)
     local src = source
+    DebugPrint('requestJack from %d: vehNetId=%s seatIndex=%s', src, tostring(vehNetId), tostring(seatIndex))
 
-    if type(vehNetId) ~= 'number' or type(seatIndex) ~= 'number' then return end
+    if type(vehNetId) ~= 'number' or type(seatIndex) ~= 'number' then
+        DebugPrint('Rejected: bad argument types')
+        return
+    end
     if not Config.AllowCarjacking then return end
 
     if isOnCooldown(src) then
@@ -110,6 +120,7 @@ AddEventHandler('anticarjack:requestJack', function(vehNetId, seatIndex)
     lockSeat(vehNetId, seatIndex)
 
     local attackerName = GetPlayerName(src) or 'someone'
+    DebugPrint('Approved: %d (%s) jacking %d out of seat %d', src, attackerName, victimSrc, seatIndex)
     TriggerClientEvent('anticarjack:getJacked', victimSrc, vehNetId, seatIndex, attackerName)
     TriggerClientEvent('anticarjack:performJack', src, vehNetId, seatIndex)
 end)

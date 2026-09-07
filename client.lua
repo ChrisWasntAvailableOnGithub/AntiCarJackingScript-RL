@@ -37,6 +37,31 @@ function ShowNotification(msg)
     EndTextCommandThefeedPostTicker(false, true)
 end
 
+-- Toggle with the /acj_debug command or Config.Debug = true. Prints to
+-- the F8 console with everything the script decided and why, so a
+-- "why didn't I get in" report can actually be diagnosed instead of
+-- guessed at.
+local function DebugPrint(fmt, ...)
+    if not Config.Debug then return end
+    print(('[anti-carjacking] ' .. fmt):format(...))
+end
+
+local function SeatLabel(seat)
+    if seat == -1 then return 'driver' end
+    if seat == 0 then return 'front passenger' end
+    if seat == 1 then return 'rear left' end
+    if seat == 2 then return 'rear right' end
+    if seat == nil then return 'none' end
+    return ('seat %d'):format(seat)
+end
+
+RegisterCommand('acj_debug', function()
+    Config.Debug = not Config.Debug
+    local state = Config.Debug and 'ON' or 'OFF'
+    ShowNotification(('anti-carjacking debug: %s'):format(state))
+    print(('[anti-carjacking] debug mode %s'):format(state))
+end, false)
+
 local function IsSprinting(ped)
     if Config.RequireActualSprint then
         return IsPedSprinting(ped)
@@ -141,7 +166,31 @@ end
 -- ============================================================
 
 local function EnterSeat(ped, vehicle, seatIndex)
+    DebugPrint('Entering vehicle %d, %s seat (index %d)', vehicle, SeatLabel(seatIndex), seatIndex)
     TaskEnterVehicle(ped, vehicle, 8000, seatIndex, 1.0, 1, 0)
+
+    -- Safety net: TaskEnterVehicle can silently stall (most often seen
+    -- when the seat you're entering is in a vehicle someone else is
+    -- already driving - a known FiveM network-ownership quirk). If the
+    -- ped hasn't actually made it in after a few seconds and the seat
+    -- is still free, retry once instead of leaving the player stuck
+    -- standing next to the car.
+    CreateThread(function()
+        Wait(4500)
+        if not DoesEntityExist(vehicle) then return end
+        if GetPedInVehicleSeat(vehicle, seatIndex) == ped then
+            DebugPrint('Confirmed: ped is in %s seat', SeatLabel(seatIndex))
+            return
+        end
+        if IsPedInAnyVehicle(ped, false) then return end -- ended up somewhere, not stuck
+
+        DebugPrint('WARNING: entry into %s stalled after 4.5s, retrying once', SeatLabel(seatIndex))
+        if IsVehicleSeatFree(vehicle, seatIndex) then
+            TaskEnterVehicle(ped, vehicle, 8000, seatIndex, 1.0, 1, 0)
+        else
+            DebugPrint('Retry aborted: %s is no longer free', SeatLabel(seatIndex))
+        end
+    end)
 end
 
 local function JackNpc(ped, vehicle, seatIndex)
@@ -159,22 +208,32 @@ local function RequestPlayerJack(vehicle, seatIndex)
 end
 
 local function HandleVehicleEntryAttempt(ped, vehicle)
+    DebugPrint('--- F pressed near vehicle %d ---', vehicle)
+
     if Config.RespectVehicleLock and IsVehicleLockedDown(vehicle) then
         -- Locked overrides everything, including sprint+F. No jacking,
         -- no auto-routing into a free seat, no entry at all.
+        DebugPrint('Vehicle is locked (door lock status %d), blocking entry', GetVehicleDoorLockStatus(vehicle))
         ShowNotification('This vehicle is locked.')
         return
     end
 
-    local seatIndex = GetNearestSeat(vehicle, ped)
-    if not seatIndex then return end -- too far from every door, ignore
+    local seatIndex, seatDist = GetNearestSeat(vehicle, ped)
+    if not seatIndex then
+        DebugPrint('No door within %.2fm of ped, ignoring press', Config.MaxDoorDistance)
+        return
+    end
+
+    DebugPrint('Nearest seat: %s (index %d), %.2fm away', SeatLabel(seatIndex), seatIndex, seatDist or -1.0)
 
     if IsVehicleSeatFree(vehicle, seatIndex) then
+        DebugPrint('%s is free -> entering normally', SeatLabel(seatIndex))
         EnterSeat(ped, vehicle, seatIndex)
         return
     end
 
     local sprinting = IsSprinting(ped)
+    DebugPrint('%s is OCCUPIED. sprinting=%s', SeatLabel(seatIndex), tostring(sprinting))
 
     -- Nearest door is occupied and we're not explicitly trying to jack
     -- it -> silently find another empty seat instead of doing nothing
@@ -182,32 +241,45 @@ local function HandleVehicleEntryAttempt(ped, vehicle)
     if Config.AutoRouteToFreeSeat and not sprinting then
         local freeSeat = GetNearestFreeSeat(vehicle, ped)
         if freeSeat then
+            DebugPrint('Auto-routing to %s instead', SeatLabel(freeSeat))
             EnterSeat(ped, vehicle, freeSeat)
             return
         end
+        DebugPrint('AutoRouteToFreeSeat is on but no other free seat exists on this vehicle')
     end
 
     if not Config.AllowCarjacking then
+        DebugPrint('AllowCarjacking is false, blocking')
         ShowNotification('That seat is occupied.')
         return
     end
 
     local occupant = GetPedInVehicleSeat(vehicle, seatIndex)
-    if occupant == 0 or occupant == ped then return end
+    if occupant == 0 or occupant == ped then
+        DebugPrint('No valid occupant ped for %s (got %s), aborting', SeatLabel(seatIndex), tostring(occupant))
+        return
+    end
 
     local isPlayerOccupant = IsPedAPlayer(occupant)
     local needsSprint = isPlayerOccupant or Config.GateNpcJacking
+    DebugPrint('Occupant isPlayer=%s, needsSprint=%s', tostring(isPlayerOccupant), tostring(needsSprint))
 
     if needsSprint and not sprinting then
+        DebugPrint('Blocked: needs sprint+F and ped is not sprinting')
         ShowNotification('Sprint + ~INPUT_ENTER~ to force them out')
         return
     end
 
-    if not CanAttemptJackLocally() then return end
+    if not CanAttemptJackLocally() then
+        DebugPrint('Blocked by local jack debounce (800ms)')
+        return
+    end
 
     if isPlayerOccupant then
+        DebugPrint('Requesting server-validated jack on %s', SeatLabel(seatIndex))
         RequestPlayerJack(vehicle, seatIndex)
     else
+        DebugPrint('Jacking NPC locally on %s', SeatLabel(seatIndex))
         JackNpc(ped, vehicle, seatIndex)
     end
 end
@@ -219,12 +291,22 @@ end
 RegisterNetEvent('anticarjack:getJacked')
 AddEventHandler('anticarjack:getJacked', function(vehNetId, seatIndex, attackerName)
     local vehicle = NetworkGetEntityFromNetworkId(vehNetId)
-    if not DoesEntityExist(vehicle) then return end
+    if not DoesEntityExist(vehicle) then
+        DebugPrint('getJacked: vehicle netId %d does not exist locally, ignoring', vehNetId)
+        return
+    end
 
     local ped = PlayerPedId()
-    if GetVehiclePedIsIn(ped, false) ~= vehicle then return end
-    if GetPedInVehicleSeat(vehicle, seatIndex) ~= ped then return end
+    if GetVehiclePedIsIn(ped, false) ~= vehicle then
+        DebugPrint('getJacked: not in the targeted vehicle, ignoring')
+        return
+    end
+    if GetPedInVehicleSeat(vehicle, seatIndex) ~= ped then
+        DebugPrint('getJacked: not in %s seat, ignoring', SeatLabel(seatIndex))
+        return
+    end
 
+    DebugPrint('Being jacked by %s out of %s seat', tostring(attackerName), SeatLabel(seatIndex))
     allowDragOut = true
     SetPedCanBeDraggedOut(ped, true)
     ShowNotification(('You were carjacked by %s!'):format(attackerName or 'someone'))
@@ -250,10 +332,12 @@ AddEventHandler('anticarjack:performJack', function(vehNetId, seatIndex)
     end
 
     if GetPedInVehicleSeat(vehicle, seatIndex) == 0 then
+        DebugPrint('performJack: %s cleared, entering', SeatLabel(seatIndex))
         TaskEnterVehicle(ped, vehicle, 3000, seatIndex, 1.0, 1, 0)
     else
         -- Victim's exit desynced/timed out - hard warp as a fallback so
         -- the attacker isn't left standing there.
+        DebugPrint('performJack: %s never cleared within %dms, hard-warping in', SeatLabel(seatIndex), Config.JackTakeoverTimeoutMs)
         SetPedIntoVehicle(ped, vehicle, seatIndex)
     end
 end)

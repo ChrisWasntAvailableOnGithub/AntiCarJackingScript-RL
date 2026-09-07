@@ -64,6 +64,15 @@ All tunables live in `config.lua`:
   for your own framework's notify function if you'd rather use that.
 - `Config.RespectVehicleLock` — set `false` if you don't want locked
   vehicles treated specially (not recommended).
+- `Config.LockedDoorStatuses` — the exact `GetVehicleDoorLockStatus()`
+  values treated as "locked." Defaults to just `2` (what vMenu's lock
+  toggle sets). Deliberately does **not** include every non-zero status,
+  because the game's own ambient/parked vehicle population commonly
+  uses other status values (e.g. `7`, "can be broken into") that aren't
+  actually locked by anyone — treating those as locked blocks entry
+  into vehicles that look completely open. If your lock script uses a
+  different status code, add it here; `/acj_debug` prints the raw
+  status whenever it blocks an entry so you can check.
 - `Config.Debug` — set `true` (or run `/acj_debug` in the client
   console/chat at runtime) to print every entry/jack decision to the F8
   console: which seat was resolved as nearest, whether it was free,

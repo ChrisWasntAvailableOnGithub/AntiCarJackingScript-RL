@@ -66,6 +66,19 @@ Config.MaxServerJackDistance = 6.0
 -- sprint+F override. A locked vehicle stays locked no matter what.
 Config.RespectVehicleLock = true
 
+-- Which GetVehicleDoorLockStatus() values count as "locked" for the
+-- check above. 2 (LOCKED) is what vMenu's own lock toggle sets, and is
+-- the only value we block on by default. Deliberately NOT included:
+-- ambient/parked vehicles the game world spawns are very commonly
+-- status 7 (CANBEBROKENINTO) or other non-2 values out of the box, and
+-- treating those as "locked" blocks entry into vehicles that were never
+-- actually locked by anyone. If your lock script uses a different
+-- status value, add it here (check with /acj_debug - it prints the raw
+-- status when it blocks an entry).
+Config.LockedDoorStatuses = {
+    [2] = true,
+}
+
 -- ============================================================
 -- ENTRY / ANTI-SHUFFLE
 -- ============================================================

@@ -155,10 +155,11 @@ end
 -- calls SetVehicleDoorsLocked under the hood, and that state is
 -- automatically network-synced by the game itself. So this check works
 -- against vMenu, other lock scripts, or vanilla locked NPC vehicles
--- with zero extra integration.
--- 0 = NONE, 1 = UNLOCKED. Anything >= 2 is some flavor of locked.
+-- with zero extra integration. Only the exact statuses listed in
+-- Config.LockedDoorStatuses count as locked - see that config entry for
+-- why we don't just treat "anything non-zero" as locked.
 local function IsVehicleLockedDown(vehicle)
-    return GetVehicleDoorLockStatus(vehicle) >= 2
+    return Config.LockedDoorStatuses[GetVehicleDoorLockStatus(vehicle)] == true
 end
 
 -- ============================================================

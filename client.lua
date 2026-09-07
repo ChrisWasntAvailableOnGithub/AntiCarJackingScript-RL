@@ -125,6 +125,17 @@ local function GetNearestFreeSeat(vehicle, ped)
     return best
 end
 
+-- Door lock status is a base GTA native, not a vMenu-specific thing -
+-- vMenu (and every other lock resource that behaves properly) just
+-- calls SetVehicleDoorsLocked under the hood, and that state is
+-- automatically network-synced by the game itself. So this check works
+-- against vMenu, other lock scripts, or vanilla locked NPC vehicles
+-- with zero extra integration.
+-- 0 = NONE, 1 = UNLOCKED. Anything >= 2 is some flavor of locked.
+local function IsVehicleLockedDown(vehicle)
+    return GetVehicleDoorLockStatus(vehicle) >= 2
+end
+
 -- ============================================================
 -- Entry / jack resolution
 -- ============================================================
@@ -148,6 +159,13 @@ local function RequestPlayerJack(vehicle, seatIndex)
 end
 
 local function HandleVehicleEntryAttempt(ped, vehicle)
+    if Config.RespectVehicleLock and IsVehicleLockedDown(vehicle) then
+        -- Locked overrides everything, including sprint+F. No jacking,
+        -- no auto-routing into a free seat, no entry at all.
+        ShowNotification('This vehicle is locked.')
+        return
+    end
+
     local seatIndex = GetNearestSeat(vehicle, ped)
     if not seatIndex then return end -- too far from every door, ignore
 
@@ -247,6 +265,7 @@ AddEventHandler('anticarjack:jackDenied', function(reason)
         no_occupant = 'There was nobody there to jack.',
         seat_locked = 'That seat was just fought over, try again in a moment.',
         too_far     = 'You were too far from the vehicle.',
+        locked      = 'This vehicle is locked.',
         invalid     = 'That carjack attempt failed.',
     }
     ShowNotification(messages[reason] or messages.invalid)

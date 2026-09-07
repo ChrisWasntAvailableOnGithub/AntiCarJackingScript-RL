@@ -52,6 +52,12 @@ Config.JackTakeoverTimeoutMs = 1500
 -- vehicle when validating a jack request, to make spoofed events useless.
 Config.MaxServerJackDistance = 6.0
 
+-- If a vehicle's doors are locked (via vMenu, another lock script, or
+-- just vanilla SetVehicleDoorsLocked), block ALL entry through this
+-- script entirely - no jacking, no auto-routing into a free seat, no
+-- sprint+F override. A locked vehicle stays locked no matter what.
+Config.RespectVehicleLock = true
+
 -- ============================================================
 -- ENTRY / ANTI-SHUFFLE
 -- ============================================================

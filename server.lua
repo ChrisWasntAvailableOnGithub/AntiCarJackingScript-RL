@@ -65,6 +65,14 @@ AddEventHandler('anticarjack:requestJack', function(vehNetId, seatIndex)
         return
     end
 
+    -- Trust nothing from the client: re-check the lock server-side too,
+    -- so a modified client can't skip the local check and jack a locked
+    -- vehicle directly via the event.
+    if Config.RespectVehicleLock and GetVehicleDoorLockStatus(vehicle) >= 2 then
+        deny(src, 'locked')
+        return
+    end
+
     local attackerPed = GetPlayerPed(src)
     if not attackerPed or attackerPed == 0 then return end
 

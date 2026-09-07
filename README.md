@@ -12,6 +12,12 @@ A standalone FiveM resource (no ESX/QBCore dependency required) that:
 3. **Routes you to the nearest open seat.** If the door you're closest to
    is taken, you're quietly moved into the next nearest empty seat
    instead of being blocked or (worse) shuffling someone else.
+4. **Fully respects vehicle locks.** If a vehicle is locked (via vMenu,
+   another lock script, or vanilla `SetVehicleDoorsLocked`), nothing in
+   this resource can enter it at all — no jacking, no sprint+F override,
+   no auto-routing into a free seat. This works with vMenu automatically
+   because door-lock state is a base GTA native that's already
+   network-synced; no vMenu-specific integration is needed.
 
 ## Install
 
@@ -56,6 +62,8 @@ All tunables live in `config.lua`:
 - `Config.UseNotifications` — toggle the built-in GTA "ticker"
   notifications. Swap the body of `ShowNotification()` in `client.lua`
   for your own framework's notify function if you'd rather use that.
+- `Config.RespectVehicleLock` — set `false` if you don't want locked
+  vehicles treated specially (not recommended).
 
 ## Notes / limitations
 

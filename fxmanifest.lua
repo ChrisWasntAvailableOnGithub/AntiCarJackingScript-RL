@@ -3,9 +3,9 @@ game 'gta5'
 lua54 'yes'
 
 name 'anti-carjacking'
-author 'Chris'
+author 'https://github.com/ChrisWasntAvailableOnGithub'
 description 'Gated carjacking (sprint+F to jack), anti-shuffle, and nearest-free-seat vehicle entry'
-version '1.0.0'
+version '1.0.2'
 
 shared_scripts {
     'config.lua'
